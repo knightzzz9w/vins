@@ -192,6 +192,8 @@ class Estimator:
         depth_map[y_coords, x_coords] = depths
         
         
+        
+        
         invalid_depth_mask = np.isnan(depth_map)
         depth_map[invalid_depth_mask] = depth_median
         depth_map += np.random.standard_normal(depth_map.shape)*np.where(invalid_depth_mask , depth_std*0.5 , depth_std*0.1 )
@@ -226,6 +228,186 @@ class Estimator:
         
         print("new points sample after downsampling is " , new_points_3D_cam.shape)
         return homogeneous_pixel_coords[:2 , :].T , new_points_3D_cam
+
+
+    # def map(self, current_window, prune=False, iters=1):
+    #     if len(current_window) == 0:
+    #         return
+
+    #     viewpoint_stack = [self.viewpoints[kf_idx] for kf_idx in current_window]
+    #     random_viewpoint_stack = []
+    #     frames_to_optimize = self.config["Training"]["pose_window"]
+
+    #     current_window_set = set(current_window)
+    #     for cam_idx, viewpoint in self.viewpoints.items():
+    #         if cam_idx in current_window_set:
+    #             continue
+    #         random_viewpoint_stack.append(viewpoint)
+
+    #     for _ in range(iters):
+    #         self.iteration_count += 1
+    #         self.last_sent += 1
+
+    #         loss_mapping = 0
+    #         viewspace_point_tensor_acm = []
+    #         visibility_filter_acm = []
+    #         radii_acm = []
+    #         n_touched_acm = []
+
+    #         keyframes_opt = []
+
+    #         for cam_idx in range(len(current_window)):
+    #             viewpoint = viewpoint_stack[cam_idx]
+    #             keyframes_opt.append(viewpoint)
+    #             render_pkg = render(
+    #                 viewpoint, self.gaussians, self.pipeline_params, self.background
+    #             )
+    #             (
+    #                 image,
+    #                 viewspace_point_tensor,
+    #                 visibility_filter,
+    #                 radii,
+    #                 depth,
+    #                 opacity,
+    #                 n_touched,
+    #             ) = (
+    #                 render_pkg["render"],
+    #                 render_pkg["viewspace_points"],
+    #                 render_pkg["visibility_filter"],
+    #                 render_pkg["radii"],
+    #                 render_pkg["depth"],
+    #                 render_pkg["opacity"],
+    #                 render_pkg["n_touched"],
+    #             )
+
+    #             loss_mapping += get_loss_mapping(
+    #                 self.config, image, depth, viewpoint, opacity
+    #             )
+    #             viewspace_point_tensor_acm.append(viewspace_point_tensor)
+    #             visibility_filter_acm.append(visibility_filter)
+    #             radii_acm.append(radii)
+    #             n_touched_acm.append(n_touched)
+
+    #         for cam_idx in torch.randperm(len(random_viewpoint_stack))[:2]:
+    #             viewpoint = random_viewpoint_stack[cam_idx]
+    #             render_pkg = render(
+    #                 viewpoint, self.gaussians, self.pipeline_params, self.background
+    #             )
+    #             (
+    #                 image,
+    #                 viewspace_point_tensor,
+    #                 visibility_filter,
+    #                 radii,
+    #                 depth,
+    #                 opacity,
+    #                 n_touched,
+    #             ) = (
+    #                 render_pkg["render"],
+    #                 render_pkg["viewspace_points"],
+    #                 render_pkg["visibility_filter"],
+    #                 render_pkg["radii"],
+    #                 render_pkg["depth"],
+    #                 render_pkg["opacity"],
+    #                 render_pkg["n_touched"],
+    #             )
+    #             loss_mapping += get_loss_mapping(
+    #                 self.config, image, depth, viewpoint, opacity
+    #             )
+    #             viewspace_point_tensor_acm.append(viewspace_point_tensor)
+    #             visibility_filter_acm.append(visibility_filter)
+    #             radii_acm.append(radii)
+
+    #         scaling = self.gaussians.get_scaling
+    #         isotropic_loss = torch.abs(scaling - scaling.mean(dim=1).view(-1, 1))
+    #         loss_mapping += 10 * isotropic_loss.mean()
+    #         loss_mapping.backward()
+    #         gaussian_split = False
+    #         ## Deinsifying / Pruning Gaussians
+    #         with torch.no_grad():
+    #             self.occ_aware_visibility = {}
+    #             for idx in range((len(current_window))):
+    #                 kf_idx = current_window[idx]
+    #                 n_touched = n_touched_acm[idx]
+    #                 self.occ_aware_visibility[kf_idx] = (n_touched > 0).long()
+
+    #             # # compute the visibility of the gaussians
+    #             # # Only prune on the last iteration and when we have full window
+    #             if prune:
+    #                 if len(current_window) == self.config["Training"]["window_size"]:
+    #                     prune_mode = self.config["Training"]["prune_mode"]
+    #                     prune_coviz = 3
+    #                     self.gaussians.n_obs.fill_(0)
+    #                     for window_idx, visibility in self.occ_aware_visibility.items():
+    #                         self.gaussians.n_obs += visibility.cpu()
+    #                     to_prune = None
+    #                     if prune_mode == "odometry":
+    #                         to_prune = self.gaussians.n_obs < 3
+    #                         # make sure we don't split the gaussians, break here.
+    #                     if prune_mode == "slam":
+    #                         # only prune keyframes which are relatively new
+    #                         sorted_window = sorted(current_window, reverse=True)
+    #                         mask = self.gaussians.unique_kfIDs >= sorted_window[2]
+    #                         if not self.initialized:
+    #                             mask = self.gaussians.unique_kfIDs >= 0
+    #                         to_prune = torch.logical_and(
+    #                             self.gaussians.n_obs <= prune_coviz, mask
+    #                         )
+    #                     if to_prune is not None and self.monocular:
+    #                         self.gaussians.prune_points(to_prune.cuda())
+    #                         for idx in range((len(current_window))):
+    #                             current_idx = current_window[idx]
+    #                             self.occ_aware_visibility[current_idx] = (
+    #                                 self.occ_aware_visibility[current_idx][~to_prune]
+    #                             )
+    #                     if not self.initialized:
+    #                         self.initialized = True
+    #                         Log("Initialized SLAM")
+    #                     # # make sure we don't split the gaussians, break here.
+    #                 return False
+
+    #             for idx in range(len(viewspace_point_tensor_acm)):
+    #                 self.gaussians.max_radii2D[visibility_filter_acm[idx]] = torch.max(
+    #                     self.gaussians.max_radii2D[visibility_filter_acm[idx]],
+    #                     radii_acm[idx][visibility_filter_acm[idx]],
+    #                 )
+    #                 self.gaussians.add_densification_stats(
+    #                     viewspace_point_tensor_acm[idx], visibility_filter_acm[idx]
+    #                 )
+
+    #             update_gaussian = (
+    #                 self.iteration_count % self.gaussian_update_every
+    #                 == self.gaussian_update_offset
+    #             )
+    #             if update_gaussian:
+    #                 self.gaussians.densify_and_prune(
+    #                     self.opt_params.densify_grad_threshold,
+    #                     self.gaussian_th,
+    #                     self.gaussian_extent,
+    #                     self.size_threshold,
+    #                 )
+    #                 gaussian_split = True
+
+    #             ## Opacity reset
+    #             if (self.iteration_count % self.gaussian_reset) == 0 and (
+    #                 not update_gaussian
+    #             ):
+    #                 Log("Resetting the opacity of non-visible Gaussians")
+    #                 self.gaussians.reset_opacity_nonvisible(visibility_filter_acm)
+    #                 gaussian_split = True
+
+    #             self.gaussians.optimizer.step()
+    #             self.gaussians.optimizer.zero_grad(set_to_none=True)
+    #             self.gaussians.update_learning_rate(self.iteration_count)
+    #             self.keyframe_optimizers.step()
+    #             self.keyframe_optimizers.zero_grad(set_to_none=True)
+    #             # Pose update
+    #             for cam_idx in range(min(frames_to_optimize, len(current_window))):
+    #                 viewpoint = viewpoint_stack[cam_idx]
+    #                 if viewpoint.uid == 0:
+    #                     continue
+    #                 update_pose(viewpoint)
+    #     return gaussian_split
+
 
 
 
@@ -350,41 +532,38 @@ class Estimator:
             
             
             
-            
             t_render = time.time()
-            render_pkg = render(
-                cam_model, self.gaussians, self.pipeline_params, torch.tensor(self.background).to("cuda")
-            )
-            image, viewspace_point_tensor, visibility_filter, radii = render_pkg["render"], render_pkg["viewspace_points"], render_pkg["visibility_filter"], render_pkg["radii"]            
-            t_render2 = time.time()
-            
-            print("rendering time is " , (t_render2 - t_render)*1e3 , "ms" )
-            
-            # Loss
-            
-            
-            t_backward = time.time()
-            gt_image = cam_model.original_image.cuda()
-            Ll1 = l1_loss(image, gt_image)
-            loss = (1.0 - self.opt_params.lambda_dssim) * Ll1 + self.opt_params.lambda_dssim * (1.0 - ssim(image, gt_image))
-            loss.backward()
-            #iter_end.record()
-            
-            t_backward2 = time.time()
-            print("backward time is " , (t_backward2 - t_backward)*1e3 , "ms" )
-            
-            print("cur gaussian num is " , (self.gaussians._xyz.shape))
-            
-            self.pub_render(image)
-            
-            if self.frame_id % self.update_freq == self.update_offset:
-                self.gaussians.densify_and_prune(
-                self.opt_params.densify_grad_threshold,
-                self.gaussian_th,
-                self.gaussian_extent,
-                self.size_threshold,
-                    )
+            for i in range(20):
+                render_pkg = render(
+                    cam_model, self.gaussians, self.pipeline_params, torch.tensor(self.background).to("cuda")
+                )
+                image, viewspace_point_tensor, visibility_filter, radii = render_pkg["render"], render_pkg["viewspace_points"], render_pkg["visibility_filter"], render_pkg["radii"]            
                 
+                gt_image = cam_model.original_image.cuda()
+                Ll1 = l1_loss(image, gt_image)
+                loss = (1.0 - self.opt_params.lambda_dssim) * Ll1 + self.opt_params.lambda_dssim * (1.0 - ssim(image, gt_image))
+                loss.backward()
+                #iter_end.record()
+                
+                self.gaussians.optimizer.step()
+                self.gaussians.optimizer.zero_grad(set_to_none=True)
+                
+                
+                
+                
+                with torch.no_grad():
+                    if i % self.update_freq == self.update_offset:
+                        self.gaussians.densify_and_prune(
+                        self.opt_params.densify_grad_threshold,
+                        self.gaussian_th,
+                        self.gaussian_extent,
+                        self.size_threshold,
+                            )
+                    
+            t_render2 = time.time()
+            print("rendering time is " , (t_render2 - t_render)*1e3 , "ms" )
+            self.pub_render(image)
+            print("cur gaussian num is " , (self.gaussians._xyz.shape))
             self.frame_id += 1
             
             
