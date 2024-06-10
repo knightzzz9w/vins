@@ -1,0 +1,5 @@
+<launch>
+    <!-- 启动talker节点 -->
+    <!-- arg name="config_file" default="$(find vins_gs)/config/euroc/euroc.yaml" /-->
+    <node name="gsrender" pkg="vins_gs" type="vinsgs.py" output="screen"/>
+</launch>
