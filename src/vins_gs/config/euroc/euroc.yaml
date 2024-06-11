@@ -25,13 +25,30 @@ point_size: 0.01
 bg_color: [0. , 0. , 0.]
 downsample_voxelsize: 0.03
 downsample_factor: 32
-update_freq: 5
-update_offset: 3
+
+
+Results:
+  save_results: True
+  save_dir: "results"
+  save_trj: True
+  save_trj_kf_intv: 10
+  use_gui: True
+  eval_rendering: False
+  use_wandb: False
+
+
+
+Dataset:
+  type: 'euroc'
+  sensor_type: 'monocular'
+  pcd_downsample: 64
+  pcd_downsample_init: 32
+  adaptive_pointsize: True
+  point_size: 0.01
 
 
 Training:
-  init_itr_num: 400
-  itr_num: 150
+  init_itr_num: 1050
   init_gaussian_update: 100
   init_gaussian_reset: 500
   init_gaussian_th: 0.005
@@ -61,12 +78,8 @@ Training:
   lr:
     cam_rot_delta: 0.003
     cam_trans_delta: 0.001
-  
-
-
 
 opt_params:
-  spatial_lr_scale: 6.0
   iterations: 30000
   position_lr_init: 0.0016
   position_lr_final: 0.0000016
@@ -84,9 +97,17 @@ opt_params:
   densify_until_iter: 15000
   densify_grad_threshold: 0.0002
 
+model_params:
+  sh_degree: 0
+  source_path: ""
+  model_path: ""
+  resolution: -1
+  white_background: False
+  data_device: "cuda"
+
 pipeline_params:
   convert_SHs_python: False
   compute_cov3D_python: False
-  debug: False
+
 
 

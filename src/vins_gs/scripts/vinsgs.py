@@ -10,6 +10,7 @@ from threading import Lock, Condition
 from argparse import ArgumentParser
 import yaml
 from estimator import Estimator
+import torch.multiprocessing as mp
 
 
 last_imu_t = 0.0
@@ -80,9 +81,9 @@ if __name__ == '__main__':
     
     with open("/home/wkx123/vins_ws/src/vins_gs/config/euroc/euroc.yaml", "r") as yml:
         config = yaml.safe_load(yml)
-        
+    
+    mp.set_start_method("spawn")
     gs_estimator = Estimator(config)
-    gs_estimator.init_gaussian(config["opt_params"])
     
 
     

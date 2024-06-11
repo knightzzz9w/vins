@@ -11,7 +11,9 @@ from utils.logging_utils import Log
 from utils.multiprocessing_utils import clone_obj
 from utils.pose_utils import update_pose
 from utils.slam_utils import get_loss_mapping
-
+from gui import gui_utils
+import numpy as np
+import cv2
 
 class BackEnd(mp.Process):
     def __init__(self, config):
@@ -24,6 +26,8 @@ class BackEnd(mp.Process):
         self.cameras_extent = None
         self.frontend_queue = None
         self.backend_queue = None
+        self.q_main2vis = None
+        self.q_vis2main = None
         self.live_mode = False
 
         self.pause = False
@@ -84,7 +88,7 @@ class BackEnd(mp.Process):
             self.backend_queue.get()
 
     def initialize_map(self, cur_frame_idx, viewpoint):
-        for mapping_iteration in range(self.init_itr_num):
+        for mapping_iteration in range(20):
             self.iteration_count += 1
             render_pkg = render(
                 viewpoint, self.gaussians, self.pipeline_params, self.background
@@ -137,6 +141,9 @@ class BackEnd(mp.Process):
 
         self.occ_aware_visibility[cur_frame_idx] = (n_touched > 0).long()
         Log("Initialized map")
+        image_cur = render_pkg["render"]
+        numpy_image = cv2.cvtColor((image_cur*255).detach().cpu().numpy().transpose(1,2,0), cv2.COLOR_RGB2BGR)
+        cv2.imwrite("/home/wkx123/1.png",numpy_image)
         return render_pkg
 
     def map(self, current_window, prune=False, iters=1):
@@ -347,12 +354,12 @@ class BackEnd(mp.Process):
                     self.gaussians.max_radii2D[visibility_filter],
                     radii[visibility_filter],
                 )
-                self.gaussians.
+                self.gaussians.optimizer.step()
                 self.gaussians.optimizer.zero_grad(set_to_none=True)
                 self.gaussians.update_learning_rate(iteration)
         Log("Map refinement done")
 
-    def push_to_frontend(self, tag=None):
+    def push_to_frontend(self, tag=None):  #初始化的 推到前端
         self.last_sent = 0
         keyframes = []
         for kf_idx in self.current_window:
@@ -362,6 +369,7 @@ class BackEnd(mp.Process):
             tag = "sync_backend"
 
         msg = [tag, clone_obj(self.gaussians), self.occ_aware_visibility, keyframes]
+        print("push to frontend , gaussian size is ", self.gaussians._xyz.shape)
         self.frontend_queue.put(msg)
 
     def run(self):
